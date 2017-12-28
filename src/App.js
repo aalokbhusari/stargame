@@ -1,4 +1,6 @@
 import React, { Component } from 'react';
+import Timer from '../node_modules/react-timer-component/lib/Timer'
+import PropTypes from '../node_modules/prop-types'
 import logo from './logo.svg';
 import './App.css';
 import './css/font-awesome.css';
@@ -110,22 +112,41 @@ const DoneFrame = (props) =>{
   return(
   <div className='text-center'>
     <h2>{props.doneStatus}</h2>
+    <button className='btn btn-secondary' onClick={() => props.playAgain()}>Play Again </button>
   </div>);
+};
+
+const Countdown = (props, context) => {
+  const d = new Date(context.remaining);
+  const {seconds} = {
+    seconds: d.getUTCSeconds(),
+  };
+  //props.elapsedSec();
+  return (
+    <p>{seconds}</p>
+  );
+};
+
+Countdown.contextTypes = {
+  remaining: PropTypes.number,
 };
 
 Numbers.list = [1,2,3,4,5,6,7,8,9];
 
 class Game extends Component{
   static randomNumber = () => 1 + Math.floor(Math.random()*9);
-
-  state = {
+  static initialState = () => ({
     selectedNumbers: [],
     randomNumberOfStars: Game.randomNumber(),
     usedNumbers:[],
     answerIsCorrect: null,
     redraws:5,
     doneStatus: null,
-  };
+    secondsElapsed:60000,
+  });
+  
+  state = Game.initialState();
+  playAgain = () => this.setState(Game.initialState());
 
   selectNumber = (clickedNumber) => {
     if(this.state.selectedNumbers.indexOf(clickedNumber) >= 0 ) { return; }
@@ -142,6 +163,19 @@ class Game extends Component{
       selectedNumbers : prevState.selectedNumbers.filter(number => number !== clickedNumber)
     }));
   };
+
+  tick = () => {
+    if(this.state.secondsElapsed < 1000) return;
+    this.setState({secondsElapsed: this.state.secondsElapsed - 1000}, this.updateDoneStatus);
+  }
+
+  componentDidMount = () => {
+    this.interval = setInterval(this.tick, 1000);
+  }
+
+  componentWillUnmount = () => {
+    clearInterval(this.interval);
+  }
 
   checkAnswer = () => {
     this.setState(prevState => ({
@@ -167,12 +201,17 @@ class Game extends Component{
   };
 
   updateDoneStatus = () => {
-    if (this.state.usedNumbers.length === 9){
+    this.setState(prevState => {
+      if(prevState.usedNumbers.length === 9){
         return {doneStatus: 'Done. Nice!'};
-    }
-    if (this.state.redraws === 0 && !this.possibleSolutions(this.state)){
-      return {doneStatus: 'Game Over!'};
-    }    
+      }
+      if (this.state.redraws === 0 && !this.possibleSolutions(prevState)){
+        return {doneStatus: 'Game Over!'};
+      }
+      if(this.state.secondsElapsed < 1000) {
+        return {doneStatus: 'Game Over!'};
+      }
+    });
   };
 
   acceptAnswer = () => {
@@ -190,6 +229,8 @@ class Game extends Component{
         <h3>Play Nine</h3>
         <hr/>
         <div className='row'>
+          <h4>Remaining time: {this.state.secondsElapsed / 1000}</h4>
+          <br/>
           <Stars numberOfStars={this.state.randomNumberOfStars} 
           />
           <Button selectedNumbers={this.state.selectedNumbers}
@@ -205,7 +246,7 @@ class Game extends Component{
         </div>
         <br/>
         {
-          this.state.doneStatus ? <DoneFrame doneStatus={this.state.doneStatus}/> :
+          this.state.doneStatus ? <DoneFrame doneStatus={this.state.doneStatus} playAgain={this.playAgain}/> :
         
           <Numbers  selectedNumbers={this.state.selectedNumbers}
                     selectNumber={this.selectNumber}
